@@ -22,7 +22,18 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 This node supports the following Hedera operations:
 
-- none yet, just credentials atm
+- **Create Account**: Create a new Hedera account with optional initial HBAR balance
+  - Generates new ED25519 key pair
+  - Returns new account ID and keys
+- **Transfer HBAR**: Send HBAR to another account
+  - Specify recipient account ID
+  - Set transfer amount in HBAR
+  - Returns transaction status and ID
+
+### Transaction Operations
+- **Sign Transaction**: Sign a transaction payload
+  - Accepts base64-encoded transaction
+  - Returns signed transaction in base64 format
 
 ## Credentials
 

@@ -33,7 +33,7 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/Hedera.credentials.js"
+      "dist/credentials/HederaApi.credentials.js"
     ],
     "nodes": [
       "dist/nodes/Hedera/Hedera.node.js"
@@ -49,5 +49,8 @@
   },
   "peerDependencies": {
     "n8n-workflow": "*"
+  },
+  "dependencies": {
+    "@hashgraph/sdk": "^2.64.5"
   }
 }

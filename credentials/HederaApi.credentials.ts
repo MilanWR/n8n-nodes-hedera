@@ -5,7 +5,7 @@ import {
 
 export class HederaApi implements ICredentialType {
 	name = 'hederaApi';
-	displayName = 'Hedera Account';
+	displayName = 'Hedera API Account API';
 	documentationUrl = 'https://docs.hedera.com/hedera/core-concepts/accounts';
 	properties: INodeProperties[] = [
 		{
