@@ -134,8 +134,27 @@ export class Hedera implements INodeType {
 				},
 				options: [
 					{ name: 'Sign Transaction', value: 'sign', description: 'Sign a transaction payload' },
+					{ name: 'Submit Transaction', value: 'submit', description: 'Submit a signed transaction to the network' },
+					{ name: 'Sign and Submit Transaction', value: 'signAndSubmit', description: 'Sign and submit a transaction in one step' },
 				],
 				default: 'sign',
+			},
+			{
+				displayName: 'Transaction Format',
+				name: 'transactionFormat',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						transactionOperation: ['sign', 'submit', 'signAndSubmit'],
+					},
+				},
+				options: [
+					{ name: 'Base64 String', value: 'base64', description: 'Transaction as base64 encoded string' },
+					{ name: 'Buffer Object', value: 'buffer', description: 'Transaction as Buffer object with data array' },
+				],
+				default: 'base64',
+				description: 'Format of the transaction data',
 			},
 			{
 				displayName: 'Transaction (Base64)',
@@ -144,11 +163,27 @@ export class Hedera implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['transaction'],
-						transactionOperation: ['sign'],
+						transactionOperation: ['sign', 'submit', 'signAndSubmit'],
+						transactionFormat: ['base64'],
 					},
 				},
 				default: '',
-				description: 'The transaction in base64-encoded form to sign',
+				description: 'The transaction in base64-encoded form',
+				required: true,
+			},
+			{
+				displayName: 'Transaction Buffer',
+				name: 'transactionBuffer',
+				type: 'json',
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						transactionOperation: ['sign', 'submit', 'signAndSubmit'],
+						transactionFormat: ['buffer'],
+					},
+				},
+				default: '',
+				description: 'The transaction as Buffer object (e.g., from transBytes or transBase64 field)',
 				required: true,
 			},
 		],
@@ -240,15 +275,77 @@ export class Hedera implements INodeType {
 				/* ========================  transaction  ========================= */
 				else if (resource === 'transaction') {
 					const operation = this.getNodeParameter('transactionOperation', i) as string;
+					const transactionFormat = this.getNodeParameter('transactionFormat', i) as string;
+					
+					// Helper function to get transaction bytes from either format
+					const getTransactionBytes = (): Buffer => {
+						if (transactionFormat === 'base64') {
+							const txBase64 = this.getNodeParameter('transaction', i) as string;
+							return Buffer.from(txBase64, 'base64');
+						} else {
+							const bufferObj = this.getNodeParameter('transactionBuffer', i) as any;
+							
+							// Handle different possible buffer object structures
+							let data: number[];
+							if (bufferObj?.data) {
+								data = bufferObj.data;
+							} else if (bufferObj?.transBytes?.data) {
+								data = bufferObj.transBytes.data;
+							} else if (bufferObj?.transBase64?.data) {
+								data = bufferObj.transBase64.data;
+							} else if (Array.isArray(bufferObj)) {
+								data = bufferObj;
+							} else {
+								throw new NodeOperationError(this.getNode(), 'Invalid buffer object format. Expected object with data array or direct array.');
+							}
+							
+							return Buffer.from(data);
+						}
+					};
 
 					if (operation === 'sign') {
-						const txBase64 = this.getNodeParameter('transaction', i) as string;
-						const txBuffer = Buffer.from(txBase64, 'base64');
+						const txBuffer = getTransactionBytes();
 						const transaction = Transaction.fromBytes(txBuffer);
 
 						const signedTx = await transaction.sign(PrivateKey.fromString(privKeyStr));
 
 						result = {
+							signedTransaction: Buffer.from(signedTx.toBytes()).toString('base64'),
+						};
+					} else if (operation === 'submit') {
+						const txBuffer = getTransactionBytes();
+						const transaction = Transaction.fromBytes(txBuffer);
+
+						// Submit the transaction to the network
+						const txResponse = await transaction.execute(client);
+						
+						// Get the receipt to confirm execution
+						const receipt = await txResponse.getReceipt(client);
+
+						result = {
+							transactionId: txResponse.transactionId.toString(),
+							nodeId: txResponse.nodeId?.toString() || '',
+							transactionHash: Buffer.from(txResponse.transactionHash).toString('hex'),
+							status: receipt.status.toString(),
+						};
+					} else if (operation === 'signAndSubmit') {
+						const txBuffer = getTransactionBytes();
+						const transaction = Transaction.fromBytes(txBuffer);
+
+						// Sign the transaction first
+						const signedTx = await transaction.sign(PrivateKey.fromString(privKeyStr));
+						
+						// Then submit to the network
+						const txResponse = await signedTx.execute(client);
+						
+						// Get the receipt to confirm execution
+						const receipt = await txResponse.getReceipt(client);
+
+						result = {
+							transactionId: txResponse.transactionId.toString(),
+							nodeId: txResponse.nodeId?.toString() || '',
+							transactionHash: Buffer.from(txResponse.transactionHash).toString('hex'),
+							status: receipt.status.toString(),
 							signedTransaction: Buffer.from(signedTx.toBytes()).toString('base64'),
 						};
 					} else {
