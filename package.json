@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-hedera",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Hedera node for n8n",
   "keywords": [
     "n8n-community-node-package"
